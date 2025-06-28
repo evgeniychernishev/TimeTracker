@@ -99,12 +99,12 @@ $query = "
     ),
     working_hours AS (
         SELECT 
+        count(*) as working_days,
+        count(case when is_holiday = 0 then 1 end) as days_off,
             user_id,
-            COUNT(*) as working_days,
-            COUNT( CASE WHEN is_holiday = 1 THEN 1 END) as days_off,
             SUM(CASE 
                 WHEN is_holiday = 0 AND TIME_TO_SEC(TIMEDIFF(end_time, start_time)) > TIME_TO_SEC(TIMEDIFF(work_end,work_start ))
-                THEN TIME_TO_SEC(TIMEDIFF(end_time, start_time)) -  TIME_TO_SEC(TIMEDIFF( work_end,work_start)) 
+                THEN TIME_TO_SEC(TIMEDIFF(end_time, start_time)) - TIME_TO_SEC(TIMEDIFF( work_end,work_start)) 
                 ELSE 0 
             END) / 3600 as overtime_hours,
             SUM(CASE 
@@ -116,12 +116,12 @@ $query = "
                 WHEN is_holiday = 1
                 THEN TIME_TO_SEC(TIMEDIFF(end_time, start_time)) 
                 ELSE 0 
-            END) / 3600 as holiday_hours,
-            SUM(COALESCE(exclude_hours, 0)) as total_exclude_hours
+            END) / 3600 as holiday_hours
+            ,SUM(COALESCE(exclude_hours, 0)) as total_exclude_hours
             ,min(TIME_TO_SEC(TIMEDIFF( work_end,work_start)))/3600 as full_time
             ,?  as work_need_days
-        FROM timetrack_time_entries
-        left join timetrack_users on timetrack_time_entries.user_id=timetrack_users.id
+        FROM timetrack_users
+        left join timetrack_time_entries on timetrack_time_entries.user_id=timetrack_users.id
         WHERE date between  ? AND   ?
         GROUP BY user_id
     )
@@ -132,27 +132,27 @@ SELECT
     u.first_name,
     u.last_name,
     u.role,
-    u.hourly_rate,
+    u.hourly_rate as monthly_rate,
     ug.group_names as group_name,
-    COALESCE(wh.working_days, 0) as working_days,
-    COALESCE(wh.days_off, 0) as days_off,
-    /*COALESCE(wh.overtime_hours, 0)*/ 
-    (wh.total_hours) -((wh.full_time*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0))   as overtime_hours,
-    COALESCE(wh.total_hours, 0) as total_hours,
-    COALESCE(wh.holiday_hours, 0) as holiday_hours,
-    COALESCE(wh.total_exclude_hours, 0) as total_exclude_hours,
-    COALESCE(ub.bonuses_amount, 0) as total_bonuses,
     ub.bonus_details,
     u.payer,
     u.note,
     u.work_start,
     u.work_end,
+    COALESCE(wh.working_days, 0) as working_days,
+    COALESCE(wh.days_off, 0) as days_off,
+    (wh.total_hours) -((wh.full_time*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0))   as overtime_hours,
+    COALESCE(wh.total_hours, 0) as total_hours,
+    COALESCE(wh.holiday_hours, 0) as holiday_hours,
+    COALESCE(wh.total_exclude_hours, 0) as total_exclude_hours,
+    COALESCE(ub.bonuses_amount, 0) as total_bonuses,
+
     -- Расчет базовой ставки в час
-    (u.hourly_rate / 
-       wh.work_need_days
-    ) / (TIME_TO_SEC(TIMEDIFF(u.work_end, u.work_start))-  COALESCE(wh.total_exclude_hours, 0)) * 3600 as hourly_rate_calculated
-    ,
-    ((wh.full_time*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0)) as full_work_time
+    (u.hourly_rate 
+    ) / (((TIME_TO_SEC(TIMEDIFF( work_end,work_start)))/3600*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0)) as hourly_rate_calculated,
+    
+    -- Часов в месяц
+    (((TIME_TO_SEC(TIMEDIFF( work_end,work_start)))/3600*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0)) as full_work_time
     FROM timetrack_users u
 right JOIN user_groups ug ON u.id = ug.user_id
 LEFT JOIN working_hours wh ON u.id = wh.user_id
@@ -219,7 +219,8 @@ if ($search_group) {
     $params[] = $search_group;
 }
 
-$query .= " GROUP BY u.id, u.login, u.first_name, u.last_name, u.role, u.hourly_rate, ug.group_names, u.payer, u.note, u.work_start, u.work_end";
+$query .= " GROUP BY u.id, u.login, u.first_name, u.last_name, u.role, u.hourly_rate, ug.group_names, u.payer, u.note, u.work_start, u.work_end
+,wh.full_time,wh.work_need_days";
 echo '<pre>';
 //print_r($query);
 try {
@@ -307,13 +308,14 @@ try {
                                 <h2>Отчет за <?php echo date('F', mktime(0, 0, 0, $month, 1)) . ' ' . $year; ?></h2>
                             </div>
                             <div class="col text-end">
-                            <button onclick="exportTableToExcel('myTable', 'report')">Экспорт в Excel</button>
-                                
+                                <button onclick="exportTableToExcel('myTable', 'report')" class="btn btn-success">
+                                    <i class="bi bi-file-earmark-excel"></i> Экспорт в Excel
+                                </button>
                             </div>
                         </div>
 
-                        <div class="table-responsive">
-                            <table id="myTable"class="table table-striped">
+                        <div class="table-responsive" style="overflow-x: auto;">
+                            <table id="myTable" class="table table-striped" style="min-width: 1200px;">
                                 <thead>
                                     <tr>
                                         <th>Логин</th>                                      
@@ -324,13 +326,14 @@ try {
     
                                         <th>Цель (часов)</th>
                                         <th>Рабочих часов</th>
+                                        
+                                        <th>Часы выходных</th>
+                                        <th>Исключенные часы</th>
                                         <th>Переработка (часы)</th>
                                         <th>Переработка ($)</th>
                                         <th>Ставка</th>
                                         <th>$/Час</th>
                                         
-                                        <th>Часы выходных</th>
-                                        <th>Исключенные часы</th>
                                         <th>Бонусы</th>
                                         <th>Итого</th>
                                         <?php if ($_SESSION['role'] === 'admin'): ?>
@@ -386,23 +389,6 @@ try {
                                             </td>
                                             <td>
                                             <?php
-                                            $decimalHours = $user['overtime_hours'];
-
-                                            $hours = floor($decimalHours); // 3
-                                            $minutes = round(($decimalHours - $hours) * 60); // 17
-                                            
-                                            $time = sprintf('%02d:%02d', $hours, $minutes);
-                                            
-                                            echo $time; // 03:17
-                                             
-                                            //echo number_format($user['overtime_hours'], 2); 
-                                            ?>
-                                            </td>
-                                            <td><?php echo number_format($user['hourly_rate_calculated']  * $user['overtime_hours'], 2).' $'; ?></td>
-                                            <td><?php echo number_format($user['hourly_rate'], 2).' $'; ?></td>
-                                            <td><?php echo number_format($user['hourly_rate_calculated'], 2).' $'; ?></td>
-                                            <td>
-                                            <?php
                                             $decimalHours = $user['holiday_hours'];
 
                                             $hours = floor($decimalHours);
@@ -425,6 +411,24 @@ try {
                                             echo $time;
                                             ?>
                                             </td>
+                                            <td>
+                                            <?php
+                                            $decimalHours = $user['overtime_hours'];
+
+                                            $hours = floor($decimalHours); // 3
+                                            $minutes = round(($decimalHours - $hours) * 60); // 17
+                                            
+                                            $time = sprintf('%02d:%02d', $hours, $minutes);
+                                            
+                                            echo $time; // 03:17
+                                             
+                                            //echo number_format($user['overtime_hours'], 2); 
+                                            ?>
+                                            </td>
+                                            <td><?php echo number_format($user['hourly_rate_calculated']  * $user['overtime_hours'], 2).' $'; ?></td>
+                                            <td><?php echo number_format($user['monthly_rate'], 2).' $'; ?></td>
+                                            <td><?php echo number_format($user['hourly_rate_calculated'], 2).' $'; ?></td>
+                                            
                                             <td title="<?php 
                                                 echo htmlspecialchars(implode("\n", array_map(function($b) {
                                                     return $b['type'] . ': ' . $b['amount'] . 

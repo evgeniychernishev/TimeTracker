@@ -19,7 +19,7 @@ function getAllUsers($pdo) {
     $params = [];
     //////////////////////////////////////////////////////////
     // Добавляем JOIN для групп, если фильтр по группе активен
-    if (isManager() ) {
+    if (isManager() or isEmployee()) {
         $stmt = $pdo->prepare("SELECT group_id FROM timetrack_user_groups WHERE user_id = ? LIMIT 1");
         $stmt->execute([$_SESSION['user_id']]);
         $managerGroup = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -422,6 +422,7 @@ $months = [
     .users-calendar {
         margin: 0;
         overflow-x: auto;
+        max-width: 100%;
     }
     
     .users-calendar table {
@@ -604,6 +605,37 @@ $months = [
         background-color: #007bff !important;
         color: white !important;
     }
+    
+    /* Стили для кнопки выбора дней */
+    .btn-outline-primary {
+        border-color: #007bff;
+        color: #007bff;
+        background-color: transparent;
+    }
+    
+    .btn-outline-primary:hover {
+        background-color: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+    
+    .btn-outline-primary.active,
+    .btn-outline-primary:active {
+        background-color: #0056b3 !important;
+        border-color: #0056b3 !important;
+        color: white !important;
+    }
+    
+    /* Горизонтальный скролл для календаря */
+    .users-calendar {
+        margin: 0;
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    
+    .calendar-table {
+        min-width: 800px; /* Минимальная ширина таблицы */
+    }
 </style>
 
 <script>
@@ -625,6 +657,7 @@ $months = [
             
             isSelectionMode = !isSelectionMode;
             const dayCells = document.querySelectorAll('.day-cell');
+            const toggleSelectionBtn = document.querySelector('.btn-outline-primary');
             
             dayCells.forEach(cell => {
                 if (isSelectionMode) {
@@ -634,6 +667,13 @@ $months = [
                     cell.classList.remove('selected');
                 }
             });
+            
+            // Обновляем состояние кнопки
+            if (isSelectionMode) {
+                toggleSelectionBtn.classList.add('active');
+            } else {
+                toggleSelectionBtn.classList.remove('active');
+            }
             
             selectedCells = [];
             updateBulkEditButton();
@@ -681,6 +721,7 @@ $months = [
                 
                 else {
                     // Обычный режим редактирования одного дня
+                    /*
                     if (!canEdit) {
                         // Показываем только информацию о записи без возможности редактирования
                         const userId = this.getAttribute('data-user-id');
@@ -698,7 +739,7 @@ $months = [
                             });
                         return;
                     }
-                    
+                    */
                     const userId = this.getAttribute('data-user-id');
                     const date = this.getAttribute('data-date');
                     
@@ -746,7 +787,10 @@ $months = [
             const daysList = selectedCells.map(cell => {
                 const date = cell.getAttribute('data-date');
                 const userId = cell.getAttribute('data-user-id');
-                return `${date} (ID: ${userId})`;
+                // Получаем логин пользователя из строки таблицы
+                const userRow = cell.closest('tr');
+                const userName = userRow.querySelector('.user-name').textContent;
+                return `${date} (${userName})`;
             }).join('<br>');
             selectedDaysList.innerHTML = daysList;
             // Показываем модальное окно
