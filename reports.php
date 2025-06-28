@@ -137,7 +137,7 @@ SELECT
     COALESCE(wh.working_days, 0) as working_days,
     COALESCE(wh.days_off, 0) as days_off,
     /*COALESCE(wh.overtime_hours, 0)*/ 
-    ((wh.full_time*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0)) - (wh.total_hours) as overtime_hours,
+    (wh.total_hours) -((wh.full_time*COALESCE(wh.work_need_days, 0))-COALESCE(wh.total_exclude_hours, 0))   as overtime_hours,
     COALESCE(wh.total_hours, 0) as total_hours,
     COALESCE(wh.holiday_hours, 0) as holiday_hours,
     COALESCE(wh.total_exclude_hours, 0) as total_exclude_hours,
