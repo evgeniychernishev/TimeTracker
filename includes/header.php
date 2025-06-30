@@ -11,8 +11,9 @@ if (!isLoggedIn()) {
     <title><?php echo APP_NAME; ?></title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+
 </head>
-<body>
+
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
             <a class="navbar-brand" href="dashboard.php"><?php echo APP_NAME; ?></a>
@@ -58,4 +59,4 @@ if (!isLoggedIn()) {
             </div>
         </div>
     </nav>
-    <div class="container mt-4"> 
+  <!--   <div class="container mt-4">  -->

@@ -404,7 +404,7 @@ $months = [
 </div>
 
 <!-- Легенда для календаря -->
-<div class="container mt-3 mb-4">
+<div class="container-fluid mt-3 mb-4">
     <div class="legend bg-light p-3 rounded shadow-sm">
         <div class="legend-item">
             <div class="legend-color workday-color"></div>
