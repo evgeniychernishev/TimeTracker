@@ -376,7 +376,7 @@ try {
                                             <td>
                                             <?php
                                             $decimalHours = $user['total_hours'];
-
+                                            $decimalHours = floatval($user['total_hours'] ?? 0);
                                             $hours = floor($decimalHours); // 3
                                             $minutes = round(($decimalHours - $hours) * 60); // 17
                                             
@@ -390,7 +390,7 @@ try {
                                             <td>
                                             <?php
                                             $decimalHours = $user['holiday_hours'];
-
+                                            $decimalHours = floatval($user['holiday_hours'] ?? 0);
                                             $hours = floor($decimalHours);
                                             $minutes = round(($decimalHours - $hours) * 60);
                                             
@@ -402,7 +402,7 @@ try {
                                             <td>
                                             <?php
                                             $decimalHours = $user['total_exclude_hours'];
-
+                                            $decimalHours = floatval($user['total_exclude_hours'] ?? 0);
                                             $hours = floor($decimalHours);
                                             $minutes = round(($decimalHours - $hours) * 60);
                                             
@@ -413,8 +413,8 @@ try {
                                             </td>
                                             <td>
                                             <?php
-                                            $decimalHours = $user['overtime_hours'];
-
+                                            
+                                            $decimalHours = floatval($user['overtime_hours'] ?? 0);
                                             $hours = floor($decimalHours); // 3
                                             $minutes = round(($decimalHours - $hours) * 60); // 17
                                             
@@ -427,7 +427,8 @@ try {
                                             </td>
                                             <td><?php echo number_format($user['hourly_rate_calculated']  * $user['overtime_hours'], 2).' $'; ?></td>
                                             <td><?php echo number_format($user['monthly_rate'], 2).' $'; ?></td>
-                                            <td><?php echo number_format($user['hourly_rate_calculated'], 2).' $'; ?></td>
+                                            <td><?php $amount = floatval($user['hourly_rate_calculated'] ?? 0);
+                                            echo number_format($amount, 2).' $'; ?></td>
                                             
                                             <td title="<?php 
                                                 echo htmlspecialchars(implode("\n", array_map(function($b) {
