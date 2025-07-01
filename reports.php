@@ -109,16 +109,37 @@ $query = "
             END) / 3600 as overtime_hours,
             SUM(CASE 
                 WHEN is_holiday = 0
-                THEN TIME_TO_SEC(TIMEDIFF(end_time, start_time)) 
+                THEN TIME_TO_SEC(
+    CASE
+        WHEN end_time >= start_time THEN TIMEDIFF(end_time, start_time)
+        ELSE TIMEDIFF(ADDTIME(end_time, '24:00:00'), start_time)
+    END
+    )
+    /*TIME_TO_SEC(TIMEDIFF(end_time, start_time)) */
                 ELSE 0 
             END) / 3600 as total_hours,
             SUM(CASE 
                 WHEN is_holiday = 1
-                THEN TIME_TO_SEC(TIMEDIFF(end_time, start_time)) 
+                THEN 
+                TIME_TO_SEC(
+                CASE
+                    WHEN end_time >= start_time THEN TIMEDIFF(end_time, start_time)
+                    ELSE TIMEDIFF(ADDTIME(end_time, '24:00:00'), start_time)
+                END
+                )
+               /* TIME_TO_SEC(TIMEDIFF(end_time, start_time)) */
                 ELSE 0 
             END) / 3600 as holiday_hours
             ,SUM(COALESCE(exclude_hours, 0)) as total_exclude_hours
-            ,min(TIME_TO_SEC(TIMEDIFF( work_end,work_start)))/3600 as full_time
+            ,min(
+            TIME_TO_SEC(
+            CASE
+                WHEN work_end >= work_start THEN TIMEDIFF(work_end, work_start)
+                ELSE TIMEDIFF(ADDTIME(work_end, '24:00:00'), work_start)
+            END
+            )
+            /*TIME_TO_SEC(TIMEDIFF( work_end,work_start))*/
+            )/3600 as full_time
             ,?  as work_need_days
         FROM timetrack_users
         left join timetrack_time_entries on timetrack_time_entries.user_id=timetrack_users.id
@@ -347,6 +368,98 @@ try {
                             </tr>
                         </thead>
                         <tbody>
+                            <tr style="font-weight: bold; background-color: #f0f0f0;">
+                            <td>ИТОГО</td>
+                            
+                            <?php if ($_SESSION['role'] === 'admin'): ?>
+                                <td></td> <!-- Кто платит -->
+                            <?php endif; ?>
+                            
+                            <td></td> <!-- Группа -->
+                            
+                            <td>
+                                <?php
+                                $total_work_days = array_sum(array_column($results, 'working_days'));
+                                echo $total_work_days;
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                echo array_sum(array_column($results, 'days_off'));
+                                ?>
+                            </td>
+                            
+                            <td>–</td> <!-- Цель (часов) -->
+                            
+                            <td>
+                                <?php
+                                $total_work_hours = 0;
+                                foreach ($results as $u) {
+                                    $total_work_hours += strtotime($u['total_hours']) - strtotime('00:00');
+                                }
+                                echo gmdate('H:i', $total_work_hours);
+                                ?>
+                            </td>
+                            
+                            <td>–</td> <!-- Часы выходных -->
+                            <td>–</td> <!-- Исключенные часы -->
+                            
+                            <td>
+                                <?php
+                                $total_overtime = 0;
+                                foreach ($results as $u) {
+                                    $total_overtime += strtotime($u['overtime_hours']) - strtotime('00:00');
+                                }
+                                echo gmdate('H:i', $total_overtime);
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                $overtime_total = 0;
+                                foreach ($results as $u) {
+                                    $overtime_total += $u['hourly_rate_calculated'] * $u['overtime_hours'];
+                                }
+                                echo number_format($overtime_total, 2) . ' $';
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                $salary_total = array_sum(array_column($results, 'monthly_rate'));
+                                echo number_format($salary_total, 2) . ' $';
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                $rate_per_hour_total = array_sum(array_column($results, 'hourly_rate_calculated'));
+                                echo number_format($rate_per_hour_total, 2) . ' $';
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                $bonus_total = array_sum(array_column($results, 'total_bonuses'));
+                                echo number_format($bonus_total, 2) . ' $';
+                                ?>
+                            </td>
+                            
+                            <td>
+                                <?php
+                                $total_all = 0;
+                                foreach ($results as $u) {
+                                    $total_all += ($u['hourly_rate_calculated'] * $u['total_hours']) + $u['total_bonuses'];
+                                }
+                                echo number_format($total_all, 2) . ' $';
+                                ?>
+                            </td>
+                            
+                            <?php if ($_SESSION['role'] === 'admin'): ?>
+                                <td></td> <!-- Примечание -->
+                            <?php endif; ?>
+                        </tr>
                             <?php foreach ($results as $user): ?>
                                 <?php
                                 /*echo '<pre>';
@@ -501,11 +614,11 @@ function updateUserField(userId, field, value) {
 </script>
 
 <script>
-    /*
+
 function exportTableToExcel(tableID, filename = '') {
     const dataType = 'application/vnd.ms-excel';
     const table = document.getElementById(tableID);
-    const tableHTML = table.outerHTML.replace(/ /g, '%20');
+    const tableHTML = table.outerHTML;
     filename = filename ? filename + '.xls' : 'excel_data.xls';
 
     const downloadLink = document.createElement("a");
@@ -515,12 +628,12 @@ function exportTableToExcel(tableID, filename = '') {
         const blob = new Blob(['\ufeff', tableHTML], { type: dataType });
         navigator.msSaveOrOpenBlob(blob, filename);
     } else {
-        downloadLink.href = 'data:' + dataType + ', ' + tableHTML;
+        downloadLink.href = 'data:' + dataType + ', ' + encodeURIComponent(tableHTML);
         downloadLink.download = filename;
         downloadLink.click();
     }
 }
-*/
+
 </script>
 
 
